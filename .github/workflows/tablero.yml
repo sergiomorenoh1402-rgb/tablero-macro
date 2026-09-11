@@ -1,0 +1,43 @@
+name: Tablero diario
+
+# Lunes a viernes a las 13:07 UTC = 06:07 en Las Vegas (horario de verano).
+# OJO: el cron de GitHub va en UTC. Cuando cambie la hora en noviembre hay que
+# subirlo a "7 14 * * 1-5" para seguir llegando a las 06:07 locales.
+# GitHub puede retrasar las tareas programadas unos minutos si hay cola.
+on:
+  schedule:
+    - cron: "7 13 * * 1-5"
+  workflow_dispatch:        # boton para lanzarlo a mano desde la pestana Actions
+
+jobs:
+  tarjeta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Traer los numeros
+        run: python tablero.py > /dev/null
+
+      - name: Mandar la tarjeta a Telegram
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT }}
+        run: |
+          if [ -z "$TG_TOKEN" ]; then
+            echo "::error::Falta el secreto TG_TOKEN. Anadelo en Settings > Secrets and variables > Actions."
+            python tarjeta.py
+            exit 1
+          fi
+          python tarjeta.py --enviar
+
+      - name: Guardar el json de la pasada
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tablero-json
+          path: tablero.json
+          retention-days: 14
