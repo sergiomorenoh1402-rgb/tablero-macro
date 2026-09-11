@@ -58,22 +58,33 @@ def construir(d):
     hueco = dr.get("hueco_ahora_pct")
 
     if hueco is None or not act:
-        L.append("Todavia no hay hueco que medir.")
-        L.append("Sin lectura de direccion para hoy.")
+        L.append("DIRECCION DE HOY: sin lectura.")
+        L.append("Todavia no hay hueco de apertura que medir.")
     else:
-        L.append("EL DIA VIENE %s%% DESDE EL CIERRE DE AYER" % coma(hueco))
+        p = act["p_vs_ayer"]          # probabilidad de cerrar POR ENCIMA de ayer
+        fi, _ = fiabilidad(act["n"], act["ic_vs_ayer"])
+
+        # El titular va con el lado que gana y SU porcentaje, que es lo que se lee.
+        if p >= 55:
+            L.append(">> HOY APUNTA ALCISTA:  %d%%" % round(p))
+        elif p <= 45:
+            L.append(">> HOY APUNTA BAJISTA:  %d%%" % round(100 - p))
+        else:
+            L.append(">> HOY NO APUNTA A NINGUN LADO")
+            L.append("   %d%% alcista / %d%% bajista" % (round(p), round(100 - p)))
+        L.append("   Fiabilidad %s  -  %d dias parecidos" % (fi, act["n"]))
         L.append("")
-        p = act["p_vs_ayer"]
-        fi, extra = fiabilidad(act["n"], act["ic_vs_ayer"])
-        sesgo = "ALCISTA" if p > 55 else ("BAJISTA" if p < 45 else "SIN SESGO CLARO")
-        L.append("Dias que empezaron asi:")
-        L.append("   %d de cada 100 acabaron en verde" % round(p))
-        L.append("   -> se inclina a %s" % sesgo)
-        L.append("   Fiabilidad: %s%s" % (fi, extra))
+        L.append("Por que: el dia viene %s%% desde el cierre" % coma(hueco))
+        L.append("de ayer, y de los dias que empezaron asi,")
+        L.append("%d de cada 100 acabaron %s."
+                 % (round(p if p >= 50 else 100 - p),
+                    "en verde" if p >= 50 else "en rojo"))
         L.append("")
-        L.append("De aqui al cierre, venga como venga:")
-        L.append("   %d de cada 100 acaban en verde." % round(act["p_vs_apertura"]))
-        L.append("   Es lo normal de cualquier dia.")
+        L.append("OJO: ese % cuenta el movimiento que YA paso")
+        L.append("de noche. De aqui al cierre suben %d de cada"
+                 % round(act["p_vs_apertura"]))
+        L.append("100, que es lo normal de cualquier dia. El")
+        L.append("hueco no decide lo que queda de sesion.")
 
     ev = (d.get("evento") or {}).get("hoy") or []
     L.append("")
