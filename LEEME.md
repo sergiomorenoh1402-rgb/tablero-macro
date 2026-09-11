@@ -63,3 +63,38 @@ programado» un día que sí lo había. Es la parte frágil.
 - **Que la página busque los datos ella sola.** Una página publicada no puede salir a internet
   (lo bloquea la política de seguridad del visor). Por eso el reparto: el script trae, la base
   guarda, la página pinta.
+
+## La rutina en la nube (11-sep-2026)
+
+**Rutina:** `Tablero Macro MNQ - diario` · id `trig_01EDDGmCxUkayeUYsPeEM1gC`
+Se ve y se edita en https://claude.ai/code/routines
+
+- **Cuándo:** `7 13 * * 1-5` — de lunes a viernes a las **13:07 UTC**, que son las **06:07 de
+  Las Vegas**. ⚠️ El cron va en **UTC**: cuando cambie la hora en noviembre se convertirá en las
+  05:07 locales y habrá que subirlo a `7 14 * * 1-5`.
+- **Qué hace:** clona este repo, corre `tablero.py`, manda la tarjeta con `tarjeta.py --enviar`
+  y actualiza la página con `write_db`.
+- 🟢 **Para cambiar el cálculo basta con un `git push` a este repo.** La rutina no se toca.
+- ⛔ Se le quitaron los conectores (Gmail, Calendar) que se le engancharon solos al crearla.
+  No los necesita y le daban acceso de escritura al correo.
+
+### 🔴 El token de Telegram lo pega ÉL
+El encargo de la rutina lleva el marcador `PEGAR_TOKEN_AQUI`. El guardián de credenciales
+**bloquea** que yo escriba el token dentro de una configuración en la nube, y está bien que lo
+haga. Sergio lo sustituye a mano en el editor de rutinas. Mientras siga el marcador, la rutina
+imprime la tarjeta pero no la envía.
+
+⛔ **No buscar la forma de rodear eso** metiendo el token en el repo (es público), en la base de
+datos de la página (la ven todos los que abran la página) ni codificado. Es el mismo riesgo
+disfrazado.
+
+### El bot y el canal
+- Bot `tablero_mnq_bot`, creado solo para esto. ⛔ **No es el bot de Nimbo ni el del 3D**
+  ([[reference_telegram_sergio]]): si este token se cae, no abre nada más.
+- Canal privado **Tablero**, id `-1004465877423`.
+
+### Por qué el repo es público
+La app de Claude en GitHub **no está instalada** en su cuenta, solo autorizada, y sin instalar
+las rutinas solo alcanzan repos **públicos** — se vio porque en el desplegable solo aparecía
+`pulso-latino-generador`, el único público de los tres. Decisión suya: *"publico, tampoco soy
+tan importante como para q me hackeen"*. Aquí dentro no hay credenciales ni nada con ventaja.
