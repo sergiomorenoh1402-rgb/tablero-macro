@@ -64,37 +64,51 @@ programado» un día que sí lo había. Es la parte frágil.
   (lo bloquea la política de seguridad del visor). Por eso el reparto: el script trae, la base
   guarda, la página pinta.
 
-## La rutina en la nube (11-sep-2026)
+## Quien lo dispara cada dia: GitHub Actions
 
-**Rutina:** `Tablero Macro MNQ - diario` · id `trig_01EDDGmCxUkayeUYsPeEM1gC`
-Se ve y se edita en https://claude.ai/code/routines
+`.github/workflows/tablero.yml` — lunes a viernes, `7 13 * * 1-5` (UTC) = **06:07 de Las Vegas**.
+Corre `tablero.py`, manda la tarjeta con `tarjeta.py --enviar` y guarda el json de la pasada
+como artefacto de la ejecucion (14 dias). Tambien se puede lanzar a mano desde la pestana
+**Actions** del repo, boton *Run workflow*.
 
-- **Cuándo:** `7 13 * * 1-5` — de lunes a viernes a las **13:07 UTC**, que son las **06:07 de
-  Las Vegas**. ⚠️ El cron va en **UTC**: cuando cambie la hora en noviembre se convertirá en las
-  05:07 locales y habrá que subirlo a `7 14 * * 1-5`.
-- **Qué hace:** clona este repo, corre `tablero.py`, manda la tarjeta con `tarjeta.py --enviar`
-  y actualiza la página con `write_db`.
-- 🟢 **Para cambiar el cálculo basta con un `git push` a este repo.** La rutina no se toca.
-- ⛔ Se le quitaron los conectores (Gmail, Calendar) que se le engancharon solos al crearla.
-  No los necesita y le daban acceso de escritura al correo.
+⚠️ El cron va en **UTC**: en noviembre, con el cambio de hora, pasa a las 05:07 locales. Hay que
+subirlo a `7 14 * * 1-5`.
+⚠️ GitHub puede retrasar las tareas programadas unos minutos cuando hay cola. No es un reloj.
 
-### 🔴 El token de Telegram lo pega ÉL
-El encargo de la rutina lleva el marcador `PEGAR_TOKEN_AQUI`. El guardián de credenciales
-**bloquea** que yo escriba el token dentro de una configuración en la nube, y está bien que lo
-haga. Sergio lo sustituye a mano en el editor de rutinas. Mientras siga el marcador, la rutina
-imprime la tarjeta pero no la envía.
+### Los dos secretos
+En **Settings → Secrets and variables → Actions** del repo:
+- `TG_TOKEN` — el token del bot `tablero_mnq_bot`
+- `TG_CHAT` — `-1004465877423`, el canal privado **Tablero**
 
-⛔ **No buscar la forma de rodear eso** metiendo el token en el repo (es público), en la base de
-datos de la página (la ven todos los que abran la página) ni codificado. Es el mismo riesgo
-disfrazado.
+⛔ **El token NUNCA va en el repo**, que es publico. Solo como secreto cifrado de Actions, que no
+se puede volver a leer. Si falta, el workflow falla a proposito y avisa en vez de callarse.
 
-### El bot y el canal
-- Bot `tablero_mnq_bot`, creado solo para esto. ⛔ **No es el bot de Nimbo ni el del 3D**
-  ([[reference_telegram_sergio]]): si este token se cae, no abre nada más.
+## ⛔🔴 LO QUE NO FUNCIONA: la rutina en la nube de Claude
+
+Se intento y **no puede funcionar**. La rutina `trig_01EDDGmCxUkayeUYsPeEM1gC` quedo
+**desactivada** (no se pueden borrar; se desactivan en https://claude.ai/code/routines).
+
+El entorno de las rutinas sale por un proxy que solo deja pasar Anthropic, los repositorios de
+paquetes y GitHub. Medido el 11-sep-2026 desde dentro:
+
+```
+query1.finance.yahoo.com  -> BLOQUEADO
+publicreporting.cftc.gov  -> BLOQUEADO
+api.telegram.org          -> BLOQUEADO
+api.github.com            -> 200 OK
+example.com               -> BLOQUEADO
+```
+
+➡️ No puede bajar precios **ni mandar Telegram**. ⛔ **No volver a intentarlo**: no es cuestion de
+permisos ni de configuracion, y el campo `user_declared_urls` de la API no se guarda.
+
+## Por que el repo es publico
+La app de Claude en GitHub **no esta instalada** en su cuenta, solo autorizada, y sin instalar,
+las rutinas solo alcanzan repos **publicos** — se vio porque en el desplegable solo aparecia
+`pulso-latino-generador`, el unico publico de los tres. Decision suya: *"publico, tampoco soy tan
+importante como para q me hackeen"*. Aqui dentro no hay credenciales ni nada con ventaja.
+
+## El bot y el canal
+- Bot `tablero_mnq_bot`, creado solo para esto. ⛔ **No es el bot de Nimbo ni el del 3D**: si este
+  token se cae, no abre nada mas.
 - Canal privado **Tablero**, id `-1004465877423`.
-
-### Por qué el repo es público
-La app de Claude en GitHub **no está instalada** en su cuenta, solo autorizada, y sin instalar
-las rutinas solo alcanzan repos **públicos** — se vio porque en el desplegable solo aparecía
-`pulso-latino-generador`, el único público de los tres. Decisión suya: *"publico, tampoco soy
-tan importante como para q me hackeen"*. Aquí dentro no hay credenciales ni nada con ventaja.
