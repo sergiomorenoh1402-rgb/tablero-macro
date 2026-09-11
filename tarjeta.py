@@ -6,10 +6,13 @@
 # El token y el destino salen de entorno para no dejarlos escritos aqui:
 #   TG_TOKEN, TG_CHAT
 #
-# REGLA DE ESTA TARJETA (10-sep-2026, decision suya):
-#   Solo DIRECCION y EVENTO. Nada de ATR, percentiles ni margenes de error:
-#   el margen se traduce a "Fiabilidad: ALTA / MEDIA / BAJA". El bloque de
-#   rango se reduce a una linea, "Maximo hoy: N contratos".
+# REGLA DE ESTA TARJETA (decision suya):
+#   Solo DIRECCION y EVENTO. Nada mas.
+#   - Nada de ATR, percentiles ni margenes de error: el margen se dice en
+#     palabras, "Fiabilidad: ALTA / MEDIA / BAJA".
+#   - La direccion va en el TITULAR con su porcentaje y del lado que gana:
+#     "HOY APUNTA BAJISTA: 62%", no "38 de cada 100 acaban en verde".
+#   - 11-sep-2026: fuera tambien el "Maximo hoy: N contratos".
 #   Todo lo demas vive en la pagina, no en el movil.
 
 import json, os, sys, urllib.request, urllib.parse, datetime
@@ -98,13 +101,9 @@ def construir(d):
             L.append("   El siguiente: %s, el %s."
                      % (prox[0]["que"], fecha_larga(prox[0]["fecha"])))
 
-    r = d.get("rango")
-    if r:
-        L.append("")
-        tope, sig = tope_contratos(r["atr20_dolares_mnq"])
-        L.append("Maximo hoy: %d contrato%s MNQ." % (tope, "" if tope == 1 else "s"))
-        L.append("   Con %d, un dia corriente se come el %d%% de tu" % (tope + 1, sig))
-        L.append("   perdida maxima. Con %d se queda en la mitad." % tope)
+    # ⛔ 11-sep-2026: el bloque de "Maximo hoy: N contratos" se quita por orden suya
+    # ("borra lo de maximo, eso no me interesa"). El dato sigue en la pagina.
+    # No volver a meterlo en la tarjeta.
 
     L.append("")
     L.append("Tablero completo: " + PAGINA)
