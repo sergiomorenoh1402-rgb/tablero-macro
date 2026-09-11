@@ -1,0 +1,8 @@
+# datos generados
+tablero.json
+pagina.html
+_snapshot.js
+# temporales de montaje: _rutina.json LLEVA EL TOKEN, nunca subirlo
+_b64.json
+_rutina.json
+_direccion*.py

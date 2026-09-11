@@ -1,0 +1,314 @@
+# tablero.py - reune los numeros del tablero macro y los deja en tablero.json
+#
+# Uso:  python "C:\Users\sergi\Desktop\Trading\Tablero Macro\tablero.py"
+#
+# No pinta nada y no manda nada. Solo escribe tablero.json al lado de este
+# fichero. Quien lo pinta es la pagina publicada; quien lo sube es Claude con
+# un write_db, o el agente programado.
+#
+# Sin dependencias: urllib y json de la libreria estandar.
+#
+# Lo que trae:
+#   1. RANGO   - ATR(20) del NQ en dolares por 1 MNQ, y donde cae ese rango
+#                dentro de los ultimos 3 anos. Es el numero que toca la cuenta.
+#   2. EVENTO  - si hoy hay dato que mueve la sesion (lista de abajo).
+#   3. TABLERO - crudo, bono 10 anos, oro, VIX, dolar: nivel, dia y 200 sesiones.
+#   4. INDICE  - donde esta el NQ respecto a su maximo y a su media de 200.
+#   5. COT     - neto de los fondos apalancados en el Nasdaq (semanal, viernes).
+#   6. DIRECCION - probabilidad medida de que el dia cierre al alza, en DOS
+#                lecturas: contra el cierre de ayer y contra la apertura.
+
+import json, urllib.request, urllib.parse, datetime, statistics, os, sys
+
+AQUI = os.path.dirname(os.path.abspath(__file__))
+MLL_TOPSTEP = 2000.0      # perdida maxima de Topstep, en tiempo real
+DOLAR_POR_PUNTO_MNQ = 2.0
+
+# ---------------------------------------------------------------- calendario
+# Eventos que mueven una sesion. Hora en ET. Se amplia a mano segun salgan
+# los calendarios oficiales (BLS y Reserva Federal).
+EVENTOS = [
+    ("2026-09-11", "08:30", "IPC de agosto", "alto"),
+    ("2026-09-16", "14:00", "FOMC + proyecciones y diagrama de puntos", "maximo"),
+    ("2026-10-02", "08:30", "Informe de empleo de septiembre", "alto"),
+    ("2026-10-13", "08:30", "IPC de septiembre", "alto"),
+    ("2026-10-28", "14:00", "FOMC", "maximo"),
+    ("2026-11-03", "-----", "Elecciones de medio termino", "alto"),
+    ("2026-11-06", "08:30", "Informe de empleo de octubre", "alto"),
+    ("2026-12-09", "14:00", "FOMC + proyecciones y diagrama de puntos", "maximo"),
+]
+
+
+def bajar(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=45) as r:
+        return json.load(r)
+
+
+def yahoo(simbolo, rango="3y"):
+    """Devuelve [(fecha, o, h, l, c)] ordenado."""
+    d = bajar("https://query1.finance.yahoo.com/v8/finance/chart/"
+              "%s?range=%s&interval=1d" % (simbolo, rango))["chart"]["result"][0]
+    q = d["indicators"]["quote"][0]
+    filas = []
+    for t, o, h, l, c in zip(d["timestamp"], q["open"], q["high"], q["low"], q["close"]):
+        if None in (o, h, l, c):
+            continue
+        f = datetime.datetime.fromtimestamp(t, datetime.UTC).date()
+        filas.append((f, o, h, l, c))
+    return filas
+
+
+def ultimo_cierre_completo():
+    """El indice al contado solo imprime sesiones cerradas. Sirve de corte para
+    descartar la sesion en curso del futuro, que traia el ATR hacia abajo."""
+    return yahoo("%5ENDX", "1mo")[-1][0]
+
+
+def media(v):
+    return sum(v) / len(v)
+
+
+def pct_en_distribucion(valor, muestra):
+    return sum(1 for x in muestra if x <= valor) / len(muestra) * 100
+
+
+# ------------------------------------------------------------------- 1. RANGO
+def bloque_rango(corte):
+    nq = [x for x in yahoo("NQ%3DF", "5y") if x[0] <= corte]
+    tr = []
+    for i in range(1, len(nq)):
+        _, _, h, l, _ = nq[i]
+        cprev = nq[i - 1][4]
+        tr.append(max(h - l, abs(h - cprev), abs(l - cprev)))
+    atr20 = media(tr[-20:])
+    atr20_d = atr20 * DOLAR_POR_PUNTO_MNQ
+
+    # serie de ATR(20) de los ultimos 3 anos, para situar el de hoy
+    serie = [media(tr[i - 20:i]) for i in range(20, len(tr) + 1)]
+    ref = serie[-756:] if len(serie) >= 756 else serie
+    pct = pct_en_distribucion(atr20, ref)
+
+    if pct < 33:    etiqueta, nota = "BAJO", "rango comprimido"
+    elif pct < 66:  etiqueta, nota = "NORMAL", "rango corriente"
+    elif pct < 90:  etiqueta, nota = "ALTO", "rango ancho, el stop de siempre se queda corto"
+    else:           etiqueta, nota = "EXTREMO", "rango de los peores dias de los ultimos 3 anos"
+
+    # cuantos de los ultimos 60 dias tuvieron rango mayor que el MLL de Topstep
+    rangos_d = [(h - l) * DOLAR_POR_PUNTO_MNQ for _, _, h, l, _ in nq[-60:]]
+    supera = sum(1 for x in rangos_d if x > MLL_TOPSTEP) / len(rangos_d) * 100
+
+    return {
+        "atr20_puntos": round(atr20, 1),
+        "atr20_dolares_mnq": round(atr20_d),
+        "pct_historico": round(pct),
+        "etiqueta": etiqueta,
+        "nota": nota,
+        "pct_del_mll": round(atr20_d / MLL_TOPSTEP * 100),
+        "dias60_rango_mayor_que_mll": round(supera, 1),
+        "rango_medio_60d": round(media(rangos_d)),
+    }
+
+
+# ------------------------------------------------------------------ 2. EVENTO
+def bloque_evento(hoy):
+    prox = []
+    for f, hora, que, peso in EVENTOS:
+        d = datetime.date.fromisoformat(f)
+        if d >= hoy:
+            prox.append({"fecha": f, "hora": hora, "que": que, "peso": peso,
+                         "dias": (d - hoy).days})
+    prox.sort(key=lambda x: x["fecha"])
+    hoy_hay = [p for p in prox if p["dias"] == 0]
+    return {"hoy": hoy_hay, "proximos": prox[:5]}
+
+
+# ----------------------------------------------------------------- 3. TABLERO
+MERCADOS = [
+    ("CL%3DF",      "Crudo WTI",      "$",   2),
+    ("%5ETNX",      "Bono 10 anos",   "%",   2),
+    ("GC%3DF",      "Oro",            "$",   0),
+    ("%5EVIX",      "VIX",            "",    2),
+    ("DX-Y.NYB",    "Dolar (DXY)",    "",    2),
+]
+
+
+def bloque_tablero():
+    out = []
+    for sim, nombre, unidad, dec in MERCADOS:
+        try:
+            v = yahoo(sim, "2y")
+        except Exception as e:
+            out.append({"nombre": nombre, "error": str(e)})
+            continue
+        cierres = [c for _, _, _, _, c in v]
+        ult, prev = cierres[-1], cierres[-2]
+        ma200 = media(cierres[-200:]) if len(cierres) >= 200 else media(cierres)
+        max1a = max(cierres[-252:])
+        out.append({
+            "nombre": nombre,
+            "unidad": unidad,
+            "nivel": round(ult, dec),
+            "dia_pct": round((ult / prev - 1) * 100, 2),
+            "vs_ma200_pct": round((ult / ma200 - 1) * 100, 1),
+            "desde_max1a_pct": round((ult / max1a - 1) * 100, 1),
+        })
+    return out
+
+
+# ------------------------------------------------------------------ 4. INDICE
+def bloque_indice():
+    v = yahoo("%5ENDX", "2y")
+    c = [x[4] for x in v]
+    ult, prev = c[-1], c[-2]
+    ma200 = media(c[-200:])
+    mx = max(c[-252:])
+    i_mx = len(c) - 1 - c[::-1].index(mx)
+    return {
+        "nivel": round(ult),
+        "fecha": v[-1][0].isoformat(),
+        "dia_pct": round((ult / prev - 1) * 100, 2),
+        "ano_pct": round((ult / c[-252] - 1) * 100, 1),
+        "vs_ma200_pct": round((ult / ma200 - 1) * 100, 1),
+        "desde_max_pct": round((ult / mx - 1) * 100, 1),
+        "fecha_max": v[i_mx][0].isoformat(),
+    }
+
+
+# --------------------------------------------------------------------- 5. COT
+def bloque_cot():
+    url = ("https://publicreporting.cftc.gov/resource/gpe5-46if.json"
+           "?$where=contract_market_name='NASDAQ-100 Consolidated'"
+           "&$select=report_date_as_yyyy_mm_dd,lev_money_positions_long,"
+           "lev_money_positions_short,open_interest_all"
+           "&$order=report_date_as_yyyy_mm_dd DESC&$limit=160")
+    d = bajar(urllib.parse.quote(url, safe=":/?&=$',"))
+    filas = [{
+        "fecha": r["report_date_as_yyyy_mm_dd"][:10],
+        "neto": int(r["lev_money_positions_long"]) - int(r["lev_money_positions_short"]),
+        "largo": int(r["lev_money_positions_long"]),
+        "corto": int(r["lev_money_positions_short"]),
+    } for r in d]
+    hist = [f["neto"] for f in filas]
+    return {
+        "fecha": filas[0]["fecha"],
+        "neto": filas[0]["neto"],
+        "largo": filas[0]["largo"],
+        "corto": filas[0]["corto"],
+        "cambio_semana": filas[0]["neto"] - filas[1]["neto"],
+        "pct_3anos": round(pct_en_distribucion(filas[0]["neto"], hist)),
+        "min_3anos": min(hist),
+        "max_3anos": max(hist),
+    }
+
+
+
+# --------------------------------------------------------------- 6. DIRECCION
+# Probabilidad direccional del dia, medida, no opinada. Se calcula cada vez
+# sobre 10 anos de sesiones del NQ y se condiciona al hueco de apertura, que es
+# lo unico que se sabe de madrugada.
+#
+# 🔴 LA TRAMPA, y por eso van los DOS numeros:
+#   "cierra por encima del cierre de ayer" con un hueco grande a favor sale
+#   altisimo (>80%), pero es casi mecanico: el hueco YA esta puesto, solo hace
+#   falta no devolverlo. "cierra por encima de la APERTURA" es la sesion de
+#   verdad, y ahi el hueco no separa nada: se queda en ~55% siempre.
+# Dar solo el primero seria vender una ventaja que no existe.
+
+BUCKETS = [
+    ("hueco fuerte en contra", -99.0, -0.5),
+    ("hueco leve en contra",   -0.5,  -0.15),
+    ("sin hueco",              -0.15,  0.15),
+    ("hueco leve a favor",      0.15,  0.5),
+    ("hueco fuerte a favor",    0.5,  99.0),
+]
+
+
+def cotizacion_nq():
+    """Ultimo precio del NQ y el cierre anterior, para el hueco en curso."""
+    d = bajar("https://query1.finance.yahoo.com/v8/finance/chart/"
+              "NQ%3DF?range=5d&interval=1d")["chart"]["result"][0]["meta"]
+    return d.get("regularMarketPrice"), d.get("chartPreviousClose") or d.get("previousClose")
+
+
+def bloque_direccion(corte):
+    nq = [x for x in yahoo("NQ%3DF", "10y") if x[0] <= corte]
+    cl = [x[4] for x in nq]
+    casos = []
+    for i in range(1, len(nq)):
+        f, o, h, l, c = nq[i]
+        cp = cl[i - 1]
+        casos.append(((o / cp - 1) * 100, c > cp, c > o))
+
+    base_ayer = sum(1 for _, a, _ in casos if a) / len(casos) * 100
+    base_apert = sum(1 for _, _, b in casos if b) / len(casos) * 100
+
+    def banda(k, m):
+        p = k / m
+        return 1.96 * (p * (1 - p) / m) ** 0.5 * 100
+
+    tabla = []
+    for nombre, lo, hi in BUCKETS:
+        s = [c for c in casos if lo <= c[0] < hi]
+        if not s:
+            continue
+        ka = sum(1 for _, a, _ in s if a)
+        kb = sum(1 for _, _, b in s if b)
+        tabla.append({
+            "bucket": nombre, "n": len(s),
+            "p_vs_ayer": round(ka / len(s) * 100, 1),
+            "ic_vs_ayer": round(banda(ka, len(s)), 1),
+            "p_vs_apertura": round(kb / len(s) * 100, 1),
+            "ic_vs_apertura": round(banda(kb, len(s)), 1),
+        })
+
+    # donde estamos AHORA
+    hueco = None
+    actual = None
+    try:
+        px, prev = cotizacion_nq()
+        if px and prev:
+            hueco = round((px / prev - 1) * 100, 2)
+            for i, (nombre, lo, hi) in enumerate(BUCKETS):
+                if lo <= hueco < hi:
+                    actual = tabla[i]
+                    break
+    except Exception:
+        pass
+
+    return {
+        "muestra": len(casos),
+        "desde": nq[0][0].isoformat(),
+        "base_vs_ayer": round(base_ayer, 1),
+        "base_vs_apertura": round(base_apert, 1),
+        "hueco_ahora_pct": hueco,
+        "actual": actual,
+        "tabla": tabla,
+        "aviso": ("El primer numero cuenta el hueco, que ya esta puesto. "
+                  "El segundo es la sesion de verdad y no se mueve del ~55%."),
+    }
+
+
+def main():
+    hoy = datetime.date.today()
+    corte = ultimo_cierre_completo()
+    datos = {
+        "actualizado": datetime.datetime.now().isoformat(timespec="minutes"),
+        "fecha": hoy.isoformat(),
+        "ultimo_cierre": corte.isoformat(),
+        "rango": bloque_rango(corte),
+        "evento": bloque_evento(hoy),
+        "tablero": bloque_tablero(),
+        "indice": bloque_indice(),
+        "cot": bloque_cot(),
+        "direccion": bloque_direccion(corte),
+    }
+    destino = os.path.join(AQUI, "tablero.json")
+    with open(destino, "w", encoding="utf-8") as f:
+        json.dump(datos, f, ensure_ascii=False, indent=1)
+    print(json.dumps(datos, ensure_ascii=False))
+    print("\n-> escrito en %s" % destino, file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

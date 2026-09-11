@@ -1,0 +1,289 @@
+<title>Tablero de sesión MNQ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#E9ECEF; --panel:#FFFFFF; --sunk:#F3F5F7;
+  --ink:#131920; --muted:#5C6773; --faint:#8A94A1; --line:#D5DAE0;
+  --amber:#A8611A; --petrol:#1E4E68;
+  --calma:#1C7048; --medio:#A8611A; --alto:#B1451C; --extremo:#93221B;
+  --shadow:0 1px 3px rgba(19,25,32,.07);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ground:#0E1216; --panel:#171C22; --sunk:#12171C;
+  --ink:#E4E8ED; --muted:#8D97A4; --faint:#6C7683; --line:#242B34;
+  --amber:#E0913F; --petrol:#6BA4C4;
+  --calma:#42A377; --medio:#E0913F; --alto:#DE7A4E; --extremo:#D25A4C;
+  --shadow:0 1px 3px rgba(0,0,0,.45);
+}}
+:root[data-theme="dark"]{
+  --ground:#0E1216; --panel:#171C22; --sunk:#12171C;
+  --ink:#E4E8ED; --muted:#8D97A4; --faint:#6C7683; --line:#242B34;
+  --amber:#E0913F; --petrol:#6BA4C4;
+  --calma:#42A377; --medio:#E0913F; --alto:#DE7A4E; --extremo:#D25A4C;
+  --shadow:0 1px 3px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);
+  font-family:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:16px;line-height:1.55}
+.wrap{max-width:940px;margin:0 auto;padding-inline:20px;padding-block:28px 64px;
+  display:flex;flex-direction:column;gap:16px}
+@media(max-width:520px){.wrap{padding-inline:16px}}
+h1{font-family:Bitter,Georgia,serif;margin:0;text-wrap:balance}
+p{margin:0}
+.lbl{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.68rem;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--faint)}
+
+.bar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:baseline;justify-content:space-between}
+.bar h1{font-size:1.32rem;font-weight:700;letter-spacing:-.01em}
+.fresh{display:inline-flex;align-items:center;gap:7px;font-family:"IBM Plex Mono",monospace;
+  font-size:.76rem;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--calma);flex:none}
+.dot.old{background:var(--extremo)}
+
+.panel{background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);
+  padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+
+.regimen{border-left:4px solid var(--sev,var(--medio))}
+.reg-top{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;justify-content:space-between}
+.reg-fig{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 26px}
+.big{font-family:"IBM Plex Mono",monospace;font-size:clamp(2.4rem,9vw,3.4rem);
+  font-weight:600;line-height:1;font-variant-numeric:tabular-nums;color:var(--sev,var(--medio))}
+.big small{font-size:.32em;font-weight:500;color:var(--muted);margin-left:5px;letter-spacing:.02em}
+.pill{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:.72rem;font-weight:600;
+  letter-spacing:.12em;padding:4px 10px;border:1.5px solid var(--sev,var(--medio));color:var(--sev,var(--medio))}
+.reg-side{display:flex;flex-direction:column;gap:3px;font-size:.9rem;color:var(--muted);max-width:36ch}
+.reg-side b{color:var(--ink);font-weight:600}
+
+.gauge{display:flex;flex-direction:column;gap:7px;padding-top:12px}
+.track{position:relative;height:26px;background:var(--sunk);border:1px solid var(--line)}
+.zone{position:absolute;top:0;bottom:0;opacity:.18}
+.mark{position:absolute;top:-5px;bottom:-5px;width:3px;background:var(--ink)}
+.mark span{position:absolute;top:-20px;left:50%;transform:translateX(-50%);
+  font-family:"IBM Plex Mono",monospace;font-size:.68rem;white-space:nowrap;color:var(--ink)}
+.ticks{display:flex;justify-content:space-between;font-family:"IBM Plex Mono",monospace;
+  font-size:.66rem;color:var(--faint)}
+
+.evento{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.ev-l{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ev-chip{font-family:"IBM Plex Mono",monospace;font-size:.76rem;font-weight:600;padding:5px 10px;
+  border:1.5px solid currentColor}
+.ev-none{color:var(--calma)} .ev-hi{color:var(--extremo)}
+.ev-next{font-size:.88rem;color:var(--muted)}
+.ev-next b{color:var(--ink);font-weight:600}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);box-shadow:var(--shadow)}
+.gi{background:var(--panel);padding:14px 16px;display:flex;flex-direction:column;gap:3px}
+.gi .v{font-family:"IBM Plex Mono",monospace;font-size:1.3rem;font-weight:500;
+  font-variant-numeric:tabular-nums;line-height:1.1}
+.gi .d{font-family:"IBM Plex Mono",monospace;font-size:.78rem}
+.gi .m{font-size:.78rem;color:var(--faint)}
+.up{color:var(--calma)} .dn{color:var(--extremo)}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:700px){.duo{grid-template-columns:1fr}}
+.kv{display:flex;flex-direction:column;gap:9px}
+.kv div{display:flex;gap:14px;justify-content:space-between;align-items:baseline;font-size:.92rem}
+.kv .k{color:var(--muted)}
+.kv .v{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.foot{font-size:.88rem;color:var(--muted);border-top:1px solid var(--line);padding-top:16px;
+  display:flex;flex-direction:column;gap:9px;max-width:72ch}
+.foot b{color:var(--ink);font-weight:600}
+code{font-family:"IBM Plex Mono",monospace;font-size:.85em;background:var(--sunk);
+  border:1px solid var(--line);padding:1px 5px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="bar">
+    <h1>Tablero de sesión · MNQ</h1>
+    <span class="fresh"><i class="dot" id="dot"></i><span id="fresh">—</span></span>
+  </div>
+
+  <section class="panel regimen" id="regimen">
+    <div class="reg-top">
+      <span class="lbl">Régimen de rango · ATR(20) del NQ, en 1 MNQ</span>
+      <span class="pill" id="reg-pill">—</span>
+    </div>
+    <div class="reg-fig">
+      <div class="big" id="reg-big">—</div>
+      <div class="reg-side">
+        <p id="reg-1">—</p>
+        <p id="reg-2">—</p>
+      </div>
+    </div>
+    <div class="gauge">
+      <div class="track">
+        <div class="zone" style="left:0;width:33%;background:var(--calma)"></div>
+        <div class="zone" style="left:33%;width:33%;background:var(--medio)"></div>
+        <div class="zone" style="left:66%;width:24%;background:var(--alto)"></div>
+        <div class="zone" style="left:90%;width:10%;background:var(--extremo)"></div>
+        <div class="mark" id="mark" style="left:50%"><span id="mark-t"></span></div>
+      </div>
+      <div class="ticks"><span>bajo</span><span>normal</span><span>alto</span><span>extremo</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="evento">
+      <div class="ev-l">
+        <span class="lbl">Hoy</span>
+        <span class="ev-chip ev-none" id="ev-chip">—</span>
+      </div>
+      <span class="ev-next" id="ev-next">—</span>
+    </div>
+  </section>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="duo">
+    <section class="panel">
+      <span class="lbl">Dónde está el índice</span>
+      <div class="kv" id="indice"></div>
+    </section>
+    <section class="panel">
+      <span class="lbl">Fondos apalancados · neto en el Nasdaq</span>
+      <div class="kv" id="cot"></div>
+    </section>
+  </div>
+
+  <div class="foot">
+    <p><b>Lo que este tablero dice:</b> en qué régimen de rango estás operando, si hoy hay un dato que parte la sesión, y si algo del contexto macro está estirado. Sirve para decidir tamaño y para decidir no estar dentro.</p>
+    <p><b>Lo que no dice:</b> hacia dónde va el precio. Ninguna casilla de aquí es direccional, a propósito. El posicionamiento de los fondos explica el 0,04% de lo que hace el Nasdaq la semana siguiente, medido sobre 743 informes.</p>
+    <p><b>Cómo se actualiza:</b> <code>python "Trading\Tablero Macro\tablero.py"</code> trae los números; pídeme «actualiza el tablero» y los subo aquí. El punto de arriba se pone rojo si los datos pasan de 20 horas.</p>
+  </div>
+</div>
+
+<script>
+var SEMILLA = __DATOS__;
+
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+
+  var SEV = { BAJO: "--calma", NORMAL: "--medio", ALTO: "--alto", EXTREMO: "--extremo" };
+
+  function miles(n) { return Math.round(n).toLocaleString("es-ES"); }
+  function firma(n, dec) {
+    var s = (n >= 0 ? "+" : "") + n.toFixed(dec == null ? 2 : dec);
+    return s;
+  }
+  function clase(n) { return n > 0 ? "up" : (n < 0 ? "dn" : ""); }
+
+  function pintarFrescura(d) {
+    var t = new Date(d.actualizado);
+    var horas = (Date.now() - t.getTime()) / 36e5;
+    var viejo = !isFinite(horas) || horas > 20;
+    $("dot").className = "dot" + (viejo ? " old" : "");
+    var f = d.actualizado.replace("T", " ");
+    $("fresh").textContent = viejo
+      ? "datos del " + f + " · pídeme que lo actualice"
+      : "actualizado " + f + " · cierre del " + d.ultimo_cierre;
+  }
+
+  function pintarRegimen(r) {
+    var tok = SEV[r.etiqueta] || "--medio";
+    $("regimen").style.setProperty("--sev", "var(" + tok + ")");
+    $("reg-pill").textContent = r.etiqueta;
+    $("reg-big").innerHTML = miles(r.atr20_dolares_mnq) + " $<small>por día, 1 MNQ</small>";
+    $("reg-1").innerHTML = "Es el <b>" + r.pct_del_mll +
+      "% del MLL de Topstep</b> en un día medio, con un solo contrato.";
+    $("reg-2").innerHTML = "Más ancho que el <b>" + r.pct_historico +
+      "%</b> de los días de los últimos 3 años. " +
+      "Media de los últimos 60 días: " + miles(r.rango_medio_60d) + " $.";
+    var m = $("mark");
+    m.style.left = Math.max(0.6, Math.min(99.4, r.pct_historico)) + "%";
+    $("mark-t").textContent = r.atr20_puntos + " pts";
+  }
+
+  function pintarEvento(e) {
+    var chip = $("ev-chip");
+    if (e.hoy && e.hoy.length) {
+      chip.className = "ev-chip ev-hi";
+      chip.textContent = e.hoy[0].hora + " ET · " + e.hoy[0].que;
+    } else {
+      chip.className = "ev-chip ev-none";
+      chip.textContent = "sin dato programado";
+    }
+    var p = (e.proximos || []).filter(function (x) { return x.dias > 0; })[0];
+    $("ev-next").innerHTML = p
+      ? "Siguiente: <b>" + p.que + "</b> · " + p.fecha + " a las " + p.hora + " ET (dentro de " +
+        p.dias + (p.dias === 1 ? " día)" : " días)")
+      : "No hay nada más en el calendario cargado.";
+  }
+
+  function pintarGrid(t) {
+    var g = $("grid");
+    g.textContent = "";
+    t.forEach(function (m) {
+      var d = document.createElement("div");
+      d.className = "gi";
+      if (m.error) {
+        d.innerHTML = '<span class="lbl">' + m.nombre + '</span><span class="m">sin dato</span>';
+        g.appendChild(d); return;
+      }
+      var nivel = m.unidad === "%" ? m.nivel.toFixed(2) + "%"
+                : m.unidad === "$" ? m.nivel.toLocaleString("es-ES") + " $"
+                : m.nivel.toFixed(2);
+      d.innerHTML =
+        '<span class="lbl">' + m.nombre + '</span>' +
+        '<span class="v">' + nivel + '</span>' +
+        '<span class="d ' + clase(m.dia_pct) + '">' + firma(m.dia_pct) + '% hoy</span>' +
+        '<span class="m">' + firma(m.vs_ma200_pct, 1) + '% vs 200 sesiones</span>';
+      g.appendChild(d);
+    });
+  }
+
+  function fila(k, v, cls) {
+    return '<div><span class="k">' + k + '</span><span class="v ' + (cls || "") + '">' + v + '</span></div>';
+  }
+
+  function pintarIndice(i) {
+    $("indice").innerHTML =
+      fila("Nasdaq 100, cierre del " + i.fecha, i.nivel.toLocaleString("es-ES")) +
+      fila("En el día", firma(i.dia_pct) + "%", clase(i.dia_pct)) +
+      fila("Desde el máximo del " + i.fecha_max, firma(i.desde_max_pct, 1) + "%", clase(i.desde_max_pct)) +
+      fila("Sobre su media de 200 sesiones", firma(i.vs_ma200_pct, 1) + "%", clase(i.vs_ma200_pct)) +
+      fila("En 12 meses", firma(i.ano_pct, 1) + "%", clase(i.ano_pct));
+  }
+
+  function pintarCot(c) {
+    $("cot").innerHTML =
+      fila("Neto, informe del " + c.fecha, miles(c.neto) + " contratos", clase(c.neto)) +
+      fila("Cambio en la semana", firma(c.cambio_semana, 0), clase(c.cambio_semana)) +
+      fila("Largos / cortos", miles(c.largo) + " / " + miles(c.corto)) +
+      fila("Percentil a 3 años", c.pct_3anos + "%") +
+      fila("Rango de 3 años", miles(c.min_3anos) + " a " + miles(c.max_3anos));
+  }
+
+  function pintar(d) {
+    if (!d || !d.rango) return;
+    pintarFrescura(d);
+    pintarRegimen(d.rango);
+    pintarEvento(d.evento || { hoy: [], proximos: [] });
+    pintarGrid(d.tablero || []);
+    pintarIndice(d.indice);
+    pintarCot(d.cot);
+  }
+
+  pintar(SEMILLA);
+
+  // Si hay base de datos, manda ella: es lo que se actualiza sin republicar la
+  // pagina. Si no la hay, se queda lo de arriba, que lleva su fecha a la vista.
+  if (window.claude && typeof window.claude.use === "function") {
+    window.claude.use("db").then(function (db) {
+      if (!db) return;
+      db.doc("tablero/hoy").onSnapshot(
+        function (snap) {
+          if (!snap || !snap.exists) return;
+          var d = snap.data();
+          if (d && d.rango) pintar(d);
+        },
+        function () { /* suscripcion muerta: se queda la ultima pintada */ }
+      );
+    }).catch(function () { /* sin base: se queda la semilla fechada */ });
+  }
+})();
+</script>
