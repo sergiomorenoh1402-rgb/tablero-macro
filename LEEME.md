@@ -66,14 +66,18 @@ programado» un día que sí lo había. Es la parte frágil.
 
 ## Quien lo dispara cada dia: GitHub Actions
 
-`.github/workflows/tablero.yml` — lunes a viernes, `7 13 * * 1-5` (UTC) = **06:07 de Las Vegas**.
+`.github/workflows/tablero.yml` — lunes a viernes, `23 13 * * 1-5` (UTC) = **06:23 de Las Vegas**.
 Corre `tablero.py`, manda la tarjeta con `tarjeta.py --enviar` y guarda el json de la pasada
 como artefacto de la ejecucion (14 dias). Tambien se puede lanzar a mano desde la pestana
 **Actions** del repo, boton *Run workflow*.
 
-⚠️ El cron va en **UTC**: en noviembre, con el cambio de hora, pasa a las 05:07 locales. Hay que
-subirlo a `7 14 * * 1-5`.
-⚠️ GitHub puede retrasar las tareas programadas unos minutos cuando hay cola. No es un reloj.
+⚠️ El cron va en **UTC**: en noviembre, con el cambio de hora, pasa a las 05:23 locales. Hay que
+subirlo a `23 14 * * 1-5`.
+🔴 **GitHub NO es un reloj, y a veces directamente NO dispara.** Medido: 11-sep salio con
+**3 h 52 min de retraso** (16:59 UTC en vez de 13:07) y **el 14-sep no salio en todo el dia**.
+Estaba en el minuto **07**, dentro del pico `:00-:10` donde programa todo el mundo. Movido al
+minuto **23**. Es una mitigacion, no una garantia: si vuelve a faltar, se lanza a mano desde
+**Actions → Run workflow** (o `gh workflow run tablero.yml`) y llega en ~15 s.
 
 ### Los dos secretos
 En **Settings → Secrets and variables → Actions** del repo:

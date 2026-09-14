@@ -1,12 +1,14 @@
 name: Tablero diario
 
-# Lunes a viernes a las 13:07 UTC = 06:07 en Las Vegas (horario de verano).
+# Lunes a viernes a las 13:23 UTC = 06:23 en Las Vegas (horario de verano).
 # OJO: el cron de GitHub va en UTC. Cuando cambie la hora en noviembre hay que
-# subirlo a "7 14 * * 1-5" para seguir llegando a las 06:07 locales.
-# GitHub puede retrasar las tareas programadas unos minutos si hay cola.
+# subirlo a "23 14 * * 1-5" para seguir llegando a las 06:23 locales.
+# 14-sep: el minuto 07 estaba en el pico de cola de GitHub (todo el mundo programa
+# en :00-:10). El 11-sep salio con 4 h de retraso y el 14-sep NO SALIO. Movido al
+# minuto 23, fuera del pico. GitHub no garantiza la hora de las tareas programadas.
 on:
   schedule:
-    - cron: "7 13 * * 1-5"
+    - cron: "23 13 * * 1-5"
   workflow_dispatch:        # boton para lanzarlo a mano desde la pestana Actions
 
 jobs:
