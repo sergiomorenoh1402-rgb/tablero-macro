@@ -51,6 +51,49 @@ inflan algún true range suelto. No afecta a la media de 20, pero no leer un dí
 ⚠️ Se descarta siempre la **sesión en curso**: el corte es el último cierre del índice al
 contado (`ultimo_cierre` en el json). Sin ese corte, la barra a medias metía el ATR hacia abajo.
 
+## La DIRECCION: que mide exactamente, y que NO mide
+
+Pregunta suya, 14-sep: *"cuando dices q cierre verde, q significa, q NY puede subir?"*.
+La respuesta es **NO**, y por eso el titular cambio.
+
+Hay **dos preguntas distintas** que se pueden llamar "cierra verde", y solo una tiene respuesta:
+
+| | pregunta | ¿se puede saber? |
+|---|---|---|
+| **A** | ¿cierra por encima del **cierre de ayer**? (incluye la noche) | **si**, de 21% a 82% |
+| **B** | ¿sube la **sesion de NY**, de 09:30 a 16:00? | **no**, plana en ~54% |
+
+```
+la noche viene...          n     A: sobre ayer    B: NY sube
+  bajando fuerte          450         20.9%         53.1%
+  bajando poco            371         39.6%         56.1%
+  plana                   555         54.8%         53.9%
+  subiendo poco           552         70.8%         54.2%
+  subiendo fuerte         584         82.0%         55.7%
+```
+⭐ **A va de 21 a 82. B no se entera de nada.** Y el **11,4%** de los dias cierran por encima de
+ayer **habiendo caido toda la sesion de Nueva York**. Por eso la tarjeta dice literalmente
+"ACABA POR ENCIMA DE AYER" y nunca "hoy apunta alcista".
+
+### Los tres fallos que hubo que arreglar (todos la misma familia)
+🔴 **1. La tabla se calculaba sobre `NQ=F`**, cuya barra diaria abre a las **18:00 ET del dia
+anterior**. El "hueco" que salia era el reabrir de las 18:00: el **70%** de las sesiones caian en
+"sin hueco". ✅ Ahora la tabla va sobre **`^NDX`**, que solo imprime sesion regular.
+
+🔴 **2. En vivo se comparaba el FUTURO contra el CONTADO.** No cotizan al mismo nivel: hoy NQ=F
+29.549,8 contra ^NDX 29.212,0, **337 puntos = +1,16% de base** que entraba como si fuera
+movimiento. Amontonaba 279 de 499 dias en "subiendo fuerte". ✅ Ahora la noche se mide **futuro
+contra futuro**: precio de ahora contra el cierre del futuro a las 16:00 ET de ayer.
+
+🔴 **3. La señal en vivo y la tabla eran variables distintas** (lo canto Codex). ✅ Medido: el
+movimiento del futuro a las 09:00 y el hueco del contado a las 09:30 tienen **correlacion 0,9705**,
+misma media (+0,065% contra +0,062%), misma desviacion y **92% de coincidencia de signo**. Son la
+misma variable, asi que vale usar la tabla de 10 años con lectura en vivo del futuro.
+
+⭐ **La pista que delata a los tres: un cubo que se traga la mayoria de la muestra.** 70% en "sin
+hueco", 56% en "subiendo fuerte". Si pasa eso, la variable esta mal definida. Ahora reparten
+450/371/555/552/584.
+
 ## El bloque CONTEXTO: 25 series gratis
 
 `tablero.json` lleva una clave **`contexto`** con todo lo gratis y sin clave que se puede mirar

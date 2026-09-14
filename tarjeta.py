@@ -67,27 +67,28 @@ def construir(d):
         p = act["p_vs_ayer"]          # probabilidad de cerrar POR ENCIMA de ayer
         fi, _ = fiabilidad(act["n"], act["ic_vs_ayer"])
 
-        # El titular va con el lado que gana y SU porcentaje, que es lo que se lee.
-        if p >= 55:
-            L.append(">> HOY APUNTA ALCISTA:  %d%%" % round(p))
-        elif p <= 45:
-            L.append(">> HOY APUNTA BAJISTA:  %d%%" % round(100 - p))
+        # 🔴 14-sep-2026, pregunta suya: "cuando dices q cierre verde, q
+        # significa, q NY puede subir?". La respuesta era NO, y el titular
+        # viejo ("HOY APUNTA ALCISTA") se prestaba justo a esa lectura.
+        # Ahora el titular dice LITERALMENTE lo que se mide: acabar por encima
+        # del cierre de AYER, que incluye la noche. La sesion de Nueva York es
+        # otra pregunta y no la sabe nadie: va debajo, con su numero plano.
+        L.append("El Nasdaq viene %s%% desde el cierre de ayer." % coma(hueco))
+        L.append("")
+        if p >= 50:
+            L.append(">> ACABA POR ENCIMA DE AYER: %d%%" % round(p))
         else:
-            L.append(">> HOY NO APUNTA A NINGUN LADO")
-            L.append("   %d%% alcista / %d%% bajista" % (round(p), round(100 - p)))
+            L.append(">> ACABA POR DEBAJO DE AYER: %d%%" % round(100 - p))
         L.append("   Fiabilidad %s  -  %d dias parecidos" % (fi, act["n"]))
         L.append("")
-        L.append("Por que: el dia viene %s%% desde el cierre" % coma(hueco))
-        L.append("de ayer, y de los dias que empezaron asi,")
-        L.append("%d de cada 100 acabaron %s."
-                 % (round(p if p >= 50 else 100 - p),
-                    "en verde" if p >= 50 else "en rojo"))
+        L.append("Ojo con lo que significa: ese %d%% cuenta el" % round(max(p, 100 - p)))
+        L.append("movimiento que YA paso de noche. No dice que")
+        L.append("Nueva York vaya a subir.")
         L.append("")
-        L.append("OJO: ese % cuenta el movimiento que YA paso")
-        L.append("de noche. De aqui al cierre suben %d de cada"
+        L.append("La sesion de NY (09:30-16:00) sube %d de cada"
                  % round(act["p_vs_apertura"]))
-        L.append("100, que es lo normal de cualquier dia. El")
-        L.append("hueco no decide lo que queda de sesion.")
+        L.append("100 los dias como hoy, igual que cualquier")
+        L.append("otro dia. Eso no lo sabe nadie.")
 
     ev = (d.get("evento") or {}).get("hoy") or []
     L.append("")

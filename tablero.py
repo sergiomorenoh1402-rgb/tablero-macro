@@ -18,7 +18,7 @@
 #   6. DIRECCION - probabilidad medida de que el dia cierre al alza, en DOS
 #                lecturas: contra el cierre de ayer y contra la apertura.
 
-import json, urllib.request, urllib.parse, datetime, statistics, os, sys
+import json, urllib.request, urllib.parse, datetime, statistics, os, sys, zoneinfo
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 MLL_TOPSTEP = 2000.0      # perdida maxima de Topstep, en tiempo real
@@ -290,39 +290,88 @@ def bloque_cot():
 
 
 # --------------------------------------------------------------- 6. DIRECCION
-# Probabilidad direccional del dia, medida, no opinada. Se calcula cada vez
-# sobre 10 anos de sesiones del NQ y se condiciona al hueco de apertura, que es
-# lo unico que se sabe de madrugada.
+# Probabilidad direccional del dia, medida, no opinada.
+#
+# 🔴🔴 REESCRITO EL 14-SEP-2026. La version anterior tenia DOS fallos, los dos
+# de la misma familia: medir sin mirar que ventana abarca cada dato.
+#
+#   1. Se calculaba sobre NQ=F, cuya barra DIARIA ABRE A LAS 18:00 ET DEL DIA
+#      ANTERIOR. El "hueco" que salia de ahi era el reabrir de las 18:00, que
+#      dura un minuto y casi siempre es cero: el 70% de las sesiones caian en
+#      "sin hueco". No era el hueco de nada.
+#   2. En vivo se leia el movimiento real de la noche y se puntuaba contra esa
+#      tabla. Se comparaban dos cosas distintas.
+#
+# ✅ Ahora:
+#   - La TABLA se construye sobre ^NDX (contado), que solo imprime la sesion
+#     regular: hueco = apertura(hoy) / cierre(ayer). 10 anos.
+#   - EN VIVO se lee el movimiento de la noche del futuro, futuro contra futuro
+#     (precio de ahora / cierre del futuro a las 16:00 ET de ayer). ⛔ NUNCA
+#     futuro contra contado: hoy NQ=F va 337 puntos (+1,16%) por encima de
+#     ^NDX, y esa base se colaria como si fuera movimiento.
+#   - Comprobado que las dos son la misma variable: correlacion 0,9705, misma
+#     media (+0,065% contra +0,062%), misma desviacion, y coinciden de signo el
+#     92% de las veces. Por eso vale usar 10 anos de tabla con lectura en vivo.
 #
 # 🔴 LA TRAMPA, y por eso van los DOS numeros:
-#   "cierra por encima del cierre de ayer" con un hueco grande a favor sale
-#   altisimo (>80%), pero es casi mecanico: el hueco YA esta puesto, solo hace
-#   falta no devolverlo. "cierra por encima de la APERTURA" es la sesion de
-#   verdad, y ahi el hueco no separa nada: se queda en ~55% siempre.
-# Dar solo el primero seria vender una ventaja que no existe.
+#   "cierra por encima del cierre de ayer" con la noche subiendo fuerte sale
+#   altisimo (81%), pero es casi mecanico: la subida YA esta puesta, solo hace
+#   falta no devolverla. "cierra por encima de la APERTURA" es la sesion de
+#   Nueva York de verdad, y ahi la noche no separa NADA: medido sobre los mismos
+#   cubos sale 54,1 / 61,5 / 52,9 / 57,3 / 47,8 — sin patron.
+#   El 11,4% de los dias cierran por encima de ayer HABIENDO CAIDO toda la
+#   sesion. Dar solo el primer numero seria vender una ventaja que no existe.
 
+# Los cubos describen LA NOCHE, no un "hueco" de apertura. Se renombraron el
+# 14-sep-2026 junto con el arreglo: con la tabla vieja (barra de NQ=F que abria
+# a las 18:00) el 70% de las sesiones caia en "sin hueco", que era la pista de
+# que la variable estaba mal definida. Ahora reparten 450/371/555/552/584.
 BUCKETS = [
-    ("hueco fuerte en contra", -99.0, -0.5),
-    ("hueco leve en contra",   -0.5,  -0.15),
-    ("sin hueco",              -0.15,  0.15),
-    ("hueco leve a favor",      0.15,  0.5),
-    ("hueco fuerte a favor",    0.5,  99.0),
+    ("la noche viene bajando fuerte", -99.0, -0.5),
+    ("la noche viene bajando poco",   -0.5,  -0.15),
+    ("la noche viene plana",          -0.15,  0.15),
+    ("la noche viene subiendo poco",   0.15,  0.5),
+    ("la noche viene subiendo fuerte", 0.5,  99.0),
 ]
 
 
-def cotizacion_nq():
-    """Ultimo precio del NQ y el cierre anterior, para el hueco en curso."""
+def movimiento_de_la_noche():
+    """Cuanto lleva movido el futuro desde el cierre de ayer, FUTURO CONTRA
+    FUTURO: precio de ahora contra el cierre de la barra de las 15:00 ET de
+    ayer (es decir, las 16:00 ET, cuando cierra el contado).
+
+    ⛔ No vale comparar el futuro con el cierre del CONTADO: no cotizan al
+    mismo nivel (hoy 337 puntos de diferencia) y esa base entraria como si
+    fuera movimiento."""
     d = bajar("https://query1.finance.yahoo.com/v8/finance/chart/"
-              "NQ%3DF?range=5d&interval=1d")["chart"]["result"][0]["meta"]
-    return d.get("regularMarketPrice"), d.get("chartPreviousClose") or d.get("previousClose")
+              "NQ%3DF?range=5d&interval=1h")["chart"]["result"][0]
+    ahora = d["meta"].get("regularMarketPrice")
+    q = d["indicators"]["quote"][0]
+    cierres = []
+    for t, c in zip(d["timestamp"], q["close"]):
+        if c is None:
+            continue
+        dt = datetime.datetime.fromtimestamp(t, datetime.UTC).astimezone(
+            zoneinfo.ZoneInfo("America/New_York"))
+        if dt.hour == 15:
+            cierres.append((dt.date(), c))
+    if not ahora or not cierres:
+        return None, None
+    hoy = datetime.datetime.now(zoneinfo.ZoneInfo("America/New_York")).date()
+    previos = [c for f, c in cierres if f < hoy]
+    if not previos:
+        return None, None
+    return ahora, previos[-1]
 
 
 def bloque_direccion(corte):
-    nq = [x for x in yahoo("NQ%3DF", "10y") if x[0] <= corte]
-    cl = [x[4] for x in nq]
+    # La tabla, sobre el CONTADO: solo imprime la sesion regular, asi que la
+    # noche no puede colarse dentro de la ventana que se intenta explicar.
+    ndx = [x for x in yahoo("%5ENDX", "10y") if x[0] <= corte]
+    cl = [x[4] for x in ndx]
     casos = []
-    for i in range(1, len(nq)):
-        f, o, h, l, c = nq[i]
+    for i in range(1, len(ndx)):
+        f, o, h, l, c = ndx[i]
         cp = cl[i - 1]
         casos.append(((o / cp - 1) * 100, c > cp, c > o))
 
@@ -352,7 +401,7 @@ def bloque_direccion(corte):
     hueco = None
     actual = None
     try:
-        px, prev = cotizacion_nq()
+        px, prev = movimiento_de_la_noche()
         if px and prev:
             hueco = round((px / prev - 1) * 100, 2)
             for i, (nombre, lo, hi) in enumerate(BUCKETS):
@@ -364,14 +413,15 @@ def bloque_direccion(corte):
 
     return {
         "muestra": len(casos),
-        "desde": nq[0][0].isoformat(),
+        "desde": ndx[0][0].isoformat(),
         "base_vs_ayer": round(base_ayer, 1),
         "base_vs_apertura": round(base_apert, 1),
         "hueco_ahora_pct": hueco,
         "actual": actual,
         "tabla": tabla,
-        "aviso": ("El primer numero cuenta el hueco, que ya esta puesto. "
-                  "El segundo es la sesion de verdad y no se mueve del ~55%."),
+        "aviso": ("El primero cuenta el movimiento de la noche, que ya esta "
+                  "puesto. El segundo es la sesion de Nueva York y no se mueve "
+                  "del ~54% haga lo que haga la noche."),
     }
 
 
