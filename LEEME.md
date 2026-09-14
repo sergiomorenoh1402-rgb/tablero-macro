@@ -66,18 +66,46 @@ programado» un día que sí lo había. Es la parte frágil.
 
 ## Quien lo dispara cada dia: GitHub Actions
 
-`.github/workflows/tablero.yml` — lunes a viernes, `23 13 * * 1-5` (UTC) = **06:23 de Las Vegas**.
-Corre `tablero.py`, manda la tarjeta con `tarjeta.py --enviar` y guarda el json de la pasada
-como artefacto de la ejecucion (14 dias). Tambien se puede lanzar a mano desde la pestana
-**Actions** del repo, boton *Run workflow*.
+`.github/workflows/tablero.yml` — lunes a viernes, **dos pasadas**:
 
-⚠️ El cron va en **UTC**: en noviembre, con el cambio de hora, pasa a las 05:23 locales. Hay que
-subirlo a `23 14 * * 1-5`.
-🔴 **GitHub NO es un reloj, y a veces directamente NO dispara.** Medido: 11-sep salio con
-**3 h 52 min de retraso** (16:59 UTC en vez de 13:07) y **el 14-sep no salio en todo el dia**.
-Estaba en el minuto **07**, dentro del pico `:00-:10` donde programa todo el mundo. Movido al
-minuto **23**. Es una mitigacion, no una garantia: si vuelve a faltar, se lanza a mano desde
-**Actions → Run workflow** (o `gh workflow run tablero.yml`) y llega en ~15 s.
+```
+23 13 * * 1-5   (UTC)  = 06:23 de Las Vegas   <- la buena
+23 15 * * 1-5   (UTC)  = 08:23 de Las Vegas   <- el respaldo
+```
+
+Manda la tarjeta **la primera que llegue**; la otra se calla sola. Tambien se puede lanzar a
+mano desde la pestana **Actions**, boton *Run workflow*, o con `gh workflow run tablero.yml`.
+
+## 🔴 GitHub NO es un reloj: lo encola horas
+
+Medido en este repo, no es teoria:
+
+| dia | programada | salio | retraso |
+|---|---|---|---|
+| vie 11-sep | 13:07 UTC | 16:59 UTC | **3 h 52 min** |
+| lun 14-sep | 13:07 UTC | 18:30 UTC | **5 h 24 min** |
+
+El minuto **07** caia dentro del pico `:00-:10`, donde programa medio mundo. De ahi las dos
+correcciones: el minuto **23**, fuera del pico, y una **segunda pasada de respaldo** dos horas
+despues. No hay garantia de hora; lo que si hay es una segunda oportunidad.
+
+⚠️ Con el cambio de hora de noviembre hay que subir **las dos**: `23 14` y `23 16`.
+
+### La guardia: por que no llegan dos tarjetas
+
+Cada pasada que consigue mandar la tarjeta sube un artefacto vacio llamado **`enviado-<fecha>`**.
+Lo primero que hace cualquier pasada es preguntar por la API si ese artefacto ya existe:
+
+- **existe** → hoy la tarjeta ya salio, la pasada no hace nada mas y lo dice con un *notice*.
+- **no existe** → trae los numeros, manda la tarjeta y deja la marca.
+
+Da igual cual de las dos llegue antes, y cubre el caso raro de que la de las 13:23 se encole
+tanto que aterrice despues de la de las 15:23. ⭐ La marca se deja **solo si Telegram acepto el
+envio**: si falla, no hay marca y el respaldo reintenta. Caduca a los 3 dias.
+
+⛔ Ojo: un *Run workflow* a mano tambien deja la marca. Si lo lanzas de madrugada para probar,
+la pasada de las 06:23 se callara. Es lo que queremos (ya tienes la tarjeta), pero conviene
+saberlo.
 
 ### Los dos secretos
 En **Settings → Secrets and variables → Actions** del repo:

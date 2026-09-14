@@ -1,15 +1,26 @@
 name: Tablero diario
 
-# Lunes a viernes a las 13:23 UTC = 06:23 en Las Vegas (horario de verano).
-# OJO: el cron de GitHub va en UTC. Cuando cambie la hora en noviembre hay que
-# subirlo a "23 14 * * 1-5" para seguir llegando a las 06:23 locales.
-# 14-sep: el minuto 07 estaba en el pico de cola de GitHub (todo el mundo programa
-# en :00-:10). El 11-sep salio con 4 h de retraso y el 14-sep NO SALIO. Movido al
-# minuto 23, fuera del pico. GitHub no garantiza la hora de las tareas programadas.
+# Dos pasadas al dia, de lunes a viernes:
+#   13:23 UTC = 06:23 en Las Vegas  -> la buena
+#   15:23 UTC = 08:23 en Las Vegas  -> el respaldo, por si la primera se encola
+# Manda la tarjeta LA PRIMERA QUE LLEGUE; la otra se calla sola (ver "guardia").
+#
+# OJO: el cron de GitHub va en UTC. Con el cambio de hora de noviembre hay que
+# subir las dos una hora: "23 14" y "23 16".
+#
+# 🔴 GitHub NO es un reloj. Medido en este repo: el 11-sep la pasada de las 13:07
+# salio a las 16:59 (3 h 52 min tarde) y el 14-sep a las 18:30 (5 h 24 min tarde).
+# El minuto 07 caia en el pico :00-:10, donde se encola todo el mundo. De ahi el
+# minuto 23 y de ahi el respaldo.
 on:
   schedule:
     - cron: "23 13 * * 1-5"
+    - cron: "23 15 * * 1-5"
   workflow_dispatch:        # boton para lanzarlo a mano desde la pestana Actions
+
+permissions:
+  contents: read
+  actions: read             # la guardia necesita leer los artefactos del repo
 
 jobs:
   tarjeta:
@@ -17,14 +28,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: La fecha de hoy
+        id: hoy
+        run: echo "fecha=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      # Cada pasada que consigue mandar la tarjeta deja un artefacto llamado
+      # "enviado-<fecha>". Si ya existe, es que hoy la tarjeta ya salio y esta
+      # pasada no tiene nada que hacer. Asi la de las 13:23 y la de las 15:23
+      # nunca mandan dos veces, da igual cual llegue antes.
+      - name: Comprobar si hoy ya salio
+        id: guardia
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          marca="enviado-${{ steps.hoy.outputs.fecha }}"
+          n=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=$marca&per_page=100" \
+              --jq '[.artifacts[] | select(.expired == false)] | length')
+          if [ "$n" -gt 0 ]; then
+            echo "ya=si" >> "$GITHUB_OUTPUT"
+            echo "::notice::La tarjeta de ${{ steps.hoy.outputs.fecha }} ya salio. Esta pasada no manda nada."
+          else
+            echo "ya=no" >> "$GITHUB_OUTPUT"
+            echo "Hoy todavia no ha salido. Sigo."
+          fi
+
       - uses: actions/setup-python@v5
+        if: steps.guardia.outputs.ya == 'no'
         with:
           python-version: "3.12"
 
       - name: Traer los numeros
+        if: steps.guardia.outputs.ya == 'no'
         run: python tablero.py > /dev/null
 
       - name: Mandar la tarjeta a Telegram
+        if: steps.guardia.outputs.ya == 'no'
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT: ${{ secrets.TG_CHAT }}
@@ -36,8 +74,22 @@ jobs:
           fi
           python tarjeta.py --enviar
 
+      # Solo se llega aqui si el envio salio bien: si Telegram falla, el paso de
+      # arriba corta el job y NO se deja la marca, para que el respaldo reintente.
+      - name: Dejar la marca de hoy
+        if: steps.guardia.outputs.ya == 'no'
+        run: date -u +%Y-%m-%dT%H:%M:%SZ > enviado.txt
+
+      - name: Subir la marca
+        if: steps.guardia.outputs.ya == 'no'
+        uses: actions/upload-artifact@v4
+        with:
+          name: enviado-${{ steps.hoy.outputs.fecha }}
+          path: enviado.txt
+          retention-days: 3
+
       - name: Guardar el json de la pasada
-        if: always()
+        if: always() && steps.guardia.outputs.ya == 'no'
         uses: actions/upload-artifact@v4
         with:
           name: tablero-json
