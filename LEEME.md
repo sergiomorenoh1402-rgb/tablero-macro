@@ -86,6 +86,53 @@ casi cero: no es el hueco de contado y no sirve.
 una base de 54,6%. Identico en las dos mitades de la muestra, pero su banda toca la base. Es un
 indicio, no un hallazgo.
 
+## El porcentaje de direccion: que lo mueve de verdad
+
+`direccion_modelo.py` y `direccion_0923.py` son **investigacion, no produccion**. Miden si un
+analisis macro puede dar un porcentaje honesto de la direccion del dia.
+
+**La vara de medir es la CALIBRACION, no el beneficio.** El numero no se usa para operar, asi
+que lo unico que importa es que cuando diga 62% acaben verdes ~62 de cada 100. Metrica: Brier.
+
+### Lo que salio (2.467 sesiones, corte temporal 70/30)
+```
+Brier del modelo            0.1918
+Brier de decir siempre 55.6% 0.2444      <- el modelo aporta de verdad
+acierto                     72.2% vs 57.8%
+```
+🔴 **Pero el reparto de meritos mata la idea del "analisis macro":** quitando cada variable y
+mirando cuanto empeora el Brier fuera de muestra,
+
+```
+sin hueco       +0.0430      <- se lo lleva TODO
+sin dolar       +0.0011
+sin lunes       +0.0007
+sin Asia        +0.0000
+sin Europa      -0.0000
+sin VIX         +0.0001
+```
+➡️ **Asia, Europa, el VIX y el dolar no aportan nada.** El porcentaje sale del **movimiento que
+ya lleva la noche**, no de la macro.
+
+### La auditoria de Codex y lo que corrigio
+Codex canto dos cosas CIERTAS: (1) el `hueco` usaba la apertura del contado de las **09:30**
+cuando la tarjeta sale a las **09:23** — siete minutos de informacion futura; y (2) que el 72%
+no es prediccion, porque el hueco ya es el primer tramo del propio movimiento que se predice.
+
+`direccion_0923.py` responde a la primera con datos: usa el futuro NQ a las **09:00 ET**, que son
+23 minutos ANTES de la tarjeta, o sea con MENOS informacion de la que habria en vivo.
+```
+correlacion entre la señal de 09:00 y la de 09:30   0.923
+señal 09:00 (limpia)    Brier 0.1988 (base 0.2526)  acierto 68.7%
+señal 09:30 (con fuga)  Brier 0.1825 (base 0.2526)  acierto 74.0%
+```
+⭐ La fuga inflaba, pero **el efecto sobrevive**: 68.7% contra una base de 56.7%.
+⚠️ Precio: las horarias de Yahoo solo dan 2 años, asi que ahi la muestra baja a 499 sesiones
+(150 de prueba) y la calibracion por cubos va justa.
+
+⛔ Lo que NO se puede decir de este numero: que anticipe nada. Dice cuanto empuja lo que **ya
+ha pasado de noche**. Es exactamente el aviso que la tarjeta ya lleva impreso.
+
 ## El calendario de eventos es a mano
 
 La lista `EVENTOS` de `tablero.py` está escrita a mano y hay que ampliarla cuando salgan los
