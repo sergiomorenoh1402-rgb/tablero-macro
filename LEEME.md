@@ -51,6 +51,41 @@ inflan algún true range suelto. No afecta a la media de 20, pero no leer un dí
 ⚠️ Se descarta siempre la **sesión en curso**: el corte es el último cierre del índice al
 contado (`ultimo_cierre` en el json). Sin ese corte, la barra a medias metía el ATR hacia abajo.
 
+## El bloque CONTEXTO: 25 series gratis
+
+`tablero.json` lleva una clave **`contexto`** con todo lo gratis y sin clave que se puede mirar
+antes de operar, de la misma API de Yahoo que ya se usaba: bolsas de fuera (Nikkei, Hang Seng,
+Shanghai, Corea, DAX, FTSE, Stoxx), futuros de EEUU (ES, YM, RTY), volatilidad (VIX, VIX9D,
+VIX3M, VVIX, SKEW), tipos (bono 10a, letra 3m, futuro del bono), divisas (DXY, euro, yen),
+materias primas (oro, crudo, cobre) y bitcoin. De cada una: nivel, cambio del dia, percentil
+dentro de su propio rango de 52 semanas y distancia a su media de 200.
+
+Ni secretos, ni facturas, ni dependencias. La pasada entera sigue en **~12 s** porque
+`yahoo_cache()` evita bajar dos veces los simbolos que el bloque comparte con `tablero`.
+
+⛔ **Ninguna de esas casillas dice hacia donde va el dia, y es a proposito.** Medido el
+14-sep-2026 sobre 2.512 sesiones con el objetivo limpio: de 21 senales solo 2 cruzaron su banda
+de confianza, cuando por azar se esperaria 1,1. Es ruido. Estan ahi como contexto, no como
+prediccion.
+
+### 🔴 La trampa que casi cuela: NQ=F no vale para medir direccion
+La barra **diaria** de `NQ=F` en Yahoo **abre a las 18:00 ET del dia anterior** (verificado
+contra las barras horarias). Medir "cierre > apertura" sobre ella mete **toda la noche** dentro
+de la ventana objetivo. Con eso, las bolsas asiaticas —que cierran entre las 02:00 y las 04:00
+ET, o sea **dentro**— parecian predecir el dia con **+13 puntos**. No predecian: estaban viendo
+el resultado.
+
+Con el objetivo bueno, **`^NDX` de apertura a cierre** (el indice al contado solo imprime la
+sesion regular, asi que nada nocturno se puede colar), ese mismo Nikkei se queda en **-1,9**.
+
+➡️ **Para cualquier medicion direccional el objetivo es `^NDX`, nunca `NQ=F`.** Y por lo mismo,
+el "hueco" calculado como `apertura(NQ=F) / cierre anterior` es el reabrir de las 18:00, que es
+casi cero: no es el hueco de contado y no sirve.
+
+⚠️ El efecto **lunes** tambien encoge al medirlo limpio: de 61,6% baja a **58,3% +-4,5** contra
+una base de 54,6%. Identico en las dos mitades de la muestra, pero su banda toca la base. Es un
+indicio, no un hallazgo.
+
 ## El calendario de eventos es a mano
 
 La lista `EVENTOS` de `tablero.py` está escrita a mano y hay que ampliarla cuando salgan los

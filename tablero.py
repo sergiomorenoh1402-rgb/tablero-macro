@@ -45,6 +45,19 @@ def bajar(url):
         return json.load(r)
 
 
+_CACHE = {}
+
+
+def yahoo_cache(simbolo, rango="2y"):
+    """Igual que yahoo() pero sin bajar dos veces la misma serie. El bloque de
+    contexto y el tablero de siempre comparten simbolos; sin esto se pedirian
+    por duplicado."""
+    k = (simbolo, rango)
+    if k not in _CACHE:
+        _CACHE[k] = yahoo(simbolo, rango)
+    return _CACHE[k]
+
+
 def yahoo(simbolo, rango="3y"):
     """Devuelve [(fecha, o, h, l, c)] ordenado."""
     d = bajar("https://query1.finance.yahoo.com/v8/finance/chart/"
@@ -137,7 +150,7 @@ def bloque_tablero():
     out = []
     for sim, nombre, unidad, dec in MERCADOS:
         try:
-            v = yahoo(sim, "2y")
+            v = yahoo_cache(sim, "2y")
         except Exception as e:
             out.append({"nombre": nombre, "error": str(e)})
             continue
@@ -152,6 +165,79 @@ def bloque_tablero():
             "dia_pct": round((ult / prev - 1) * 100, 2),
             "vs_ma200_pct": round((ult / ma200 - 1) * 100, 1),
             "desde_max1a_pct": round((ult / max1a - 1) * 100, 1),
+        })
+    return out
+
+
+# --------------------------------------------------------------- 3bis. CONTEXTO
+# Todo lo gratis y sin clave que se puede mirar antes de operar, en un solo
+# sitio. 25 series de la misma API de Yahoo que ya se usa: ni secretos, ni
+# facturas, ni dependencias nuevas.
+#
+# ⛔ NINGUNA DE ESTAS CASILLAS DICE HACIA DONDE VA EL DIA, y no es un descuido.
+# Medido el 14-sep-2026 sobre 2.512 sesiones, con el objetivo limpio (^NDX de
+# apertura a cierre, que es la unica ventana donde lo nocturno no se puede
+# colar dentro): de 21 senales probadas solo 2 cruzaron su banda de confianza,
+# y por puro azar se esperaria 1,1. Es ruido.
+#
+# 🔴 El aviso que costo el susto: la barra diaria de NQ=F ABRE A LAS 18:00 ET
+# DEL DIA ANTERIOR. Medir "cierre > apertura" sobre ella mete toda la noche
+# dentro de la ventana, y entonces las bolsas asiaticas (que cierran entre las
+# 02:00 y las 04:00 ET) parecen predecir con +13 puntos lo que en realidad ya
+# estan viendo. Con ^NDX ese mismo Nikkei se queda en -1,9. Para cualquier
+# medicion direccional, el objetivo es ^NDX, nunca NQ=F.
+CONTEXTO = [
+    ("%5EN225",     "Nikkei",          "bolsas fuera de EEUU", 0),
+    ("%5EHSI",      "Hang Seng",       "bolsas fuera de EEUU", 0),
+    ("000001.SS",   "Shanghai",        "bolsas fuera de EEUU", 0),
+    ("%5EKS11",     "Corea (KOSPI)",   "bolsas fuera de EEUU", 0),
+    ("%5EGDAXI",    "DAX",             "bolsas fuera de EEUU", 0),
+    ("%5EFTSE",     "FTSE 100",        "bolsas fuera de EEUU", 0),
+    ("%5ESTOXX50E", "Euro Stoxx 50",   "bolsas fuera de EEUU", 0),
+    ("ES%3DF",      "Futuro SP500",    "futuros de EEUU",      0),
+    ("YM%3DF",      "Futuro Dow",      "futuros de EEUU",      0),
+    ("RTY%3DF",     "Futuro Russell",  "futuros de EEUU",      0),
+    ("%5EVIX",      "VIX",             "volatilidad",          2),
+    ("%5EVIX9D",    "VIX 9 dias",      "volatilidad",          2),
+    ("%5EVIX3M",    "VIX 3 meses",     "volatilidad",          2),
+    ("%5EVVIX",     "VVIX",            "volatilidad",          1),
+    ("%5ESKEW",     "SKEW",            "volatilidad",          1),
+    ("%5ETNX",      "Bono 10 anos",    "tipos",                2),
+    ("%5EIRX",      "Letra 3 meses",   "tipos",                2),
+    ("ZN%3DF",      "Futuro bono 10a", "tipos",                2),
+    ("DX-Y.NYB",    "Dolar (DXY)",     "divisas",              2),
+    ("EURUSD%3DX",  "Euro",            "divisas",              4),
+    ("JPY%3DX",     "Yen",             "divisas",              2),
+    ("GC%3DF",      "Oro",             "materias primas",      0),
+    ("CL%3DF",      "Crudo WTI",       "materias primas",      2),
+    ("HG%3DF",      "Cobre",           "materias primas",      3),
+    ("BTC-USD",     "Bitcoin",         "cripto",               0),
+]
+
+
+def bloque_contexto():
+    out = []
+    for sim, nombre, familia, dec in CONTEXTO:
+        try:
+            v = yahoo_cache(sim, "2y")
+        except Exception as e:
+            out.append({"nombre": nombre, "familia": familia, "error": str(e)})
+            continue
+        c = [x[4] for x in v]
+        if len(c) < 30:
+            out.append({"nombre": nombre, "familia": familia, "error": "serie corta"})
+            continue
+        ult, prev = c[-1], c[-2]
+        ma200 = media(c[-200:]) if len(c) >= 200 else media(c)
+        ref = c[-252:] if len(c) >= 252 else c
+        out.append({
+            "nombre": nombre,
+            "familia": familia,
+            "fecha": v[-1][0].isoformat(),
+            "nivel": round(ult, dec),
+            "dia_pct": round((ult / prev - 1) * 100, 2),
+            "pct_52s": round(pct_en_distribucion(ult, ref)),
+            "vs_ma200_pct": round((ult / ma200 - 1) * 100, 1),
         })
     return out
 
@@ -299,6 +385,7 @@ def main():
         "rango": bloque_rango(corte),
         "evento": bloque_evento(hoy),
         "tablero": bloque_tablero(),
+        "contexto": bloque_contexto(),
         "indice": bloque_indice(),
         "cot": bloque_cot(),
         "direccion": bloque_direccion(corte),
