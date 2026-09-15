@@ -209,10 +209,50 @@ Medido en este repo, no es teoria:
 |---|---|---|---|
 | vie 11-sep | 13:07 UTC | 16:59 UTC | **3 h 52 min** |
 | lun 14-sep | 13:07 UTC | 18:30 UTC | **5 h 24 min** |
+| mar 15-sep | 13:23 UTC | 17:41 UTC | **4 h 19 min** |
 
 El minuto **07** caia dentro del pico `:00-:10`, donde programa medio mundo. De ahi las dos
 correcciones: el minuto **23**, fuera del pico, y una **segunda pasada de respaldo** dos horas
-despues. No hay garantia de hora; lo que si hay es una segunda oportunidad.
+despues.
+
+### 🔴🔴 15-SEP: LAS DOS CORRECCIONES FALLARON. No insistir por aqui.
+
+Le llego a las **10:41 de la manana**. Dos cosas que cierran esta via:
+
+1. **Mover el minuto no sirve.** Las tres ejecuciones aterrizan en la misma ventana absoluta
+   (17:00-18:30 UTC) **da igual a que hora se programen**. El pico `:00-:10` no era la causa.
+2. **El respaldo no existe.** El 15-sep hubo **una sola ejecucion** en todo el dia: la de las
+   15:23 UTC ni siquiera llego a crearse como run. GitHub encola las dos y drena una. ⛔ La
+   segunda pasada NO te esta dando una segunda oportunidad.
+
+⭐ **En cambio el `workflow_dispatch` es instantaneo**: en los 5 lanzamientos a mano del repo,
+`createdAt` == `startedAt` y terminado en 15-20 s. **El que falla es el RELOJ de GitHub, no
+Actions.** ➡️ La solucion es que la hora la ponga un cron externo que llame al `workflow_dispatch`;
+el workflow se queda tal cual.
+
+### 🟢 MONTADO EL 15-SEP: el reloj lo pone WINDOWS, no GitHub
+
+Tarea programada de Windows **`Tablero Macro`**, 06:23 de lunes a viernes. Lanza
+`disparar_tablero.ps1`, que hace `gh workflow run tablero.yml --ref master`. Ni token nuevo ni
+servicio de terceros: usa el `gh` que ya esta autenticado en la maquina.
+
+**Medido al montarlo:** disparo local 18:03:32 UTC → run creado en GitHub 18:03:34 UTC.
+**2 segundos**, contra las 4-5 horas del cron.
+
+```
+Ver:      Get-ScheduledTask -TaskName "Tablero Macro"
+Log:      _disparo.log  (en esta carpeta, no sube al repo)
+Quitar:   Unregister-ScheduledTask -TaskName "Tablero Macro" -Confirm:$false
+```
+
+- `WakeToRun` activado: **despierta el portatil** para lanzarlo. Los temporizadores de
+  reactivacion ya estaban permitidos con corriente alterna (no se ha tocado ningun ajuste).
+- `StartWhenAvailable` activado: si un dia el portatil esta apagado del todo, lo lanza en cuanto
+  arranca en vez de saltarse el dia.
+- ⚠️ **Con bateria los temporizadores estan desactivados** (ajuste de Windows, indice DC = 0).
+  Si duerme desenchufado, ese dia no despierta y cubren los dos `schedule` de GitHub, tarde.
+- 🟢 La hora va en **hora local**, asi que **el cambio de hora de noviembre se arregla solo**.
+  Los dos `schedule` del yml si habra que subirlos, pero ya son solo la red de seguridad.
 
 ⚠️ Con el cambio de hora de noviembre hay que subir **las dos**: `23 14` y `23 16`.
 

@@ -6,3 +6,7 @@ _snapshot.js
 _b64.json
 _rutina.json
 _direccion*.py
+
+# disparo local (no va al repo publico)
+disparar_tablero.ps1
+_disparo.log

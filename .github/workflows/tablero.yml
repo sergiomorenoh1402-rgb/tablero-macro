@@ -12,6 +12,15 @@ name: Tablero diario
 # salio a las 16:59 (3 h 52 min tarde) y el 14-sep a las 18:30 (5 h 24 min tarde).
 # El minuto 07 caia en el pico :00-:10, donde se encola todo el mundo. De ahi el
 # minuto 23 y de ahi el respaldo.
+#
+# 🔴🔴 15-SEP: NI EL MINUTO 23 NI EL RESPALDO FUNCIONARON.
+#   - la de las 13:23 salio a las 17:41 UTC (4 h 19 min tarde), le llego a las 10:41
+#   - y ese dia hubo UNA SOLA ejecucion: la de las 15:23 no llego a crearse
+# Las tres aterrizan entre las 17:00 y las 18:30 UTC da igual como se programen.
+# ⛔ No seguir moviendo el cron ni anadir mas pasadas: no es por ahi.
+# ➡️ El arreglo es un cron EXTERNO que llame al workflow_dispatch de abajo, que si
+#    arranca al instante (createdAt == startedAt en los 5 lanzamientos a mano).
+#    Los dos schedule se quedan como red de seguridad; la guardia evita duplicados.
 on:
   schedule:
     - cron: "23 13 * * 1-5"
