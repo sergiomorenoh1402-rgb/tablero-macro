@@ -232,29 +232,48 @@ el workflow se queda tal cual.
 
 ### 🟢 MONTADO EL 15-SEP: el reloj lo pone WINDOWS, no GitHub
 
-Tarea programada de Windows **`Tablero Macro`**, 06:23 de lunes a viernes. Lanza
-`disparar_tablero.ps1`, que hace `gh workflow run tablero.yml --ref master`. Ni token nuevo ni
-servicio de terceros: usa el `gh` que ya esta autenticado en la maquina.
+Tarea programada de Windows **`Tablero Macro`** → `disparar_tablero.ps1` → `gh workflow run
+tablero.yml --ref master`. Ni token nuevo ni servicio de terceros: usa el `gh` que ya esta
+autenticado en la maquina.
 
-**Medido al montarlo:** disparo local 18:03:32 UTC → run creado en GitHub 18:03:34 UTC.
-**2 segundos**, contra las 4-5 horas del cron.
+**Medido:** disparo local 18:11:03 UTC → run creado en GitHub 18:11:05 UTC. **2 segundos**,
+contra las 4-5 horas del cron.
+
+⛔ **No se dispara a una hora fija, sino CUANDO EL ENCIENDE O ABRE LA LAPTOP.** Decision suya:
+*"no la quiero dejar conectada toda la noche, pero siempre estoy despierto desde las 6 y pico"*.
+Cuatro disparadores:
+
+| disparador | cubre |
+|---|---|
+| al iniciar sesion | la enciende de cero |
+| al desbloquear la sesion | abre la tapa y mete la clave |
+| evento de reanudacion (Power-Troubleshooter id 1) | despierta sin pedir clave |
+| 06:23 L-V, con `WakeToRun` | **solo** si esa noche durmio enchufada |
+
+🟢 `DisallowStartIfOnBatteries = False`: **arranca con bateria**, que es el caso normal suyo.
+🟢 Al ir en hora local, **el cambio de hora de noviembre se arregla solo**.
+
+### Las tres guardias del `.ps1` (importan, porque se dispara muchas veces al dia)
+
+1. **Fin de semana** → no hace nada. El `schedule` del yml es L-V, pero un `workflow_dispatch`
+   se salta esa restriccion: sin esta guardia, abrir la laptop un sabado mandaria tarjeta.
+2. **Antes de las 05:00** → no hace nada. Si trasnocha y son las 00:30 ya es "otro dia": mandaria
+   la tarjeta de madrugada y la guardia 3 bloquearia la buena de por la manana.
+3. **Ya se lanzo hoy** (`_ultimo_disparo.txt`) → no hace nada. Puede abrir y cerrar la tapa las
+   veces que quiera. ⭐ La marca se escribe **solo si GitHub acepto el disparo**: si falla, el
+   siguiente desbloqueo reintenta en vez de dar el dia por perdido.
+
+⭐ Esta guardia local es la que ahorra ejecuciones; la del artefacto (abajo) es la que de verdad
+impide dos tarjetas. Probado: segundo lanzamiento seguido → `hoy ya se lanzo`, sin tocar GitHub.
 
 ```
 Ver:      Get-ScheduledTask -TaskName "Tablero Macro"
-Log:      _disparo.log  (en esta carpeta, no sube al repo)
+Log:      _disparo.log        (en esta carpeta, no sube al repo)
 Quitar:   Unregister-ScheduledTask -TaskName "Tablero Macro" -Confirm:$false
 ```
 
-- `WakeToRun` activado: **despierta el portatil** para lanzarlo. Los temporizadores de
-  reactivacion ya estaban permitidos con corriente alterna (no se ha tocado ningun ajuste).
-- `StartWhenAvailable` activado: si un dia el portatil esta apagado del todo, lo lanza en cuanto
-  arranca en vez de saltarse el dia.
-- ⚠️ **Con bateria los temporizadores estan desactivados** (ajuste de Windows, indice DC = 0).
-  Si duerme desenchufado, ese dia no despierta y cubren los dos `schedule` de GitHub, tarde.
-- 🟢 La hora va en **hora local**, asi que **el cambio de hora de noviembre se arregla solo**.
-  Los dos `schedule` del yml si habra que subirlos, pero ya son solo la red de seguridad.
-
-⚠️ Con el cambio de hora de noviembre hay que subir **las dos**: `23 14` y `23 16`.
+⚠️ Si un dia la laptop no se enciende en todo el dia, no hay tarjeta hasta que se encienda. Por
+debajo siguen los dos `schedule` de GitHub como red de seguridad, que llegaran tarde pero llegaran.
 
 ### La guardia: por que no llegan dos tarjetas
 

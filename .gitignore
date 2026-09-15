@@ -10,3 +10,4 @@ _direccion*.py
 # disparo local (no va al repo publico)
 disparar_tablero.ps1
 _disparo.log
+_ultimo_disparo.txt
