@@ -176,11 +176,25 @@ señal 09:30 (con fuga)  Brier 0.1825 (base 0.2526)  acierto 74.0%
 ⛔ Lo que NO se puede decir de este numero: que anticipe nada. Dice cuanto empuja lo que **ya
 ha pasado de noche**. Es exactamente el aviso que la tarjeta ya lleva impreso.
 
-## El calendario de eventos es a mano
+## El calendario de eventos: Forex Factory, con la lista a mano de respaldo
 
-La lista `EVENTOS` de `tablero.py` está escrita a mano y hay que ampliarla cuando salgan los
-calendarios del BLS y de la Reserva Federal. Si se queda corta, el tablero dirá «sin dato
-programado» un día que sí lo había. Es la parte frágil.
+🔴 **23-sep-2026**: el PMI preliminar de las 09:45 ET disparó el bono a 10 años al 5,09% y el NQ
+cayó 366 puntos desde la apertura. La tarjeta dijo «hoy no hay ningún dato» porque la lista a mano
+solo tenía IPC, empleo y FOMC.
+
+Desde entonces `bloque_evento` baja el calendario de **Forex Factory** (semana actual y siguiente,
+`nfs.faireconomy.media/ff_calendar_*.json`) y se queda con los eventos de **EE.UU.**:
+- los de impacto **alto y medio**, menos los discursos de miembros de la Fed;
+- ⭐ y **siempre** los de `LISTA_FIJA` (PMI, ISM, PIB, PCE, ventas minoristas, IPP, IPC, NFP,
+  JOLTS, FOMC), **aunque FF los marque bajos**. FF puso el PMI del 23-sep como impacto BAJO.
+La lista `EVENTOS` a mano sigue: se usa **entera si FF falla**, y siempre para lo que va más allá
+de las dos semanas de FF y lo que FF no pone (elecciones). La tarjeta lista **todos** los de hoy
+agrupados por hora (máx. 4 líneas). En el json, `evento.fuente` dice `forexfactory` o `manual`.
+⚠️ **FF corta con 429 si se le pide seguido** (me pasó probando). Una bajada por pasada y un
+reintento a los 20 s; si aun así falla, respaldo manual.
+⏳ **Sin verificar desde GitHub todavía**: la tarjeta del 24-sep tiene que decir
+«08:30 ET - Peticiones de subsidio por desempleo». Si dice «no hay ningún dato», el runner no
+llega a FF.
 
 ## Lo que se descartó a propósito
 
