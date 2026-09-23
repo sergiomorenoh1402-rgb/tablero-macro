@@ -93,8 +93,14 @@ def construir(d):
     ev = (d.get("evento") or {}).get("hoy") or []
     L.append("")
     if ev:
-        L.append("!! HOY a las %s ET sale %s" % (ev[0]["hora"], ev[0]["que"]))
-        L.append("   Es de los datos que parten la sesion.")
+        # 23-sep-2026: puede haber varios (PMI manufacturero + servicios a la
+        # misma hora). Se juntan por hora y salen todos, maximo 4 lineas.
+        porhora = {}
+        for x in ev:
+            porhora.setdefault(x["hora"], []).append(x["que"])
+        L.append("!! HOY hay datos que pueden mover la sesion:")
+        for hora in sorted(porhora)[:4]:
+            L.append("   %s ET - %s" % (hora, " + ".join(porhora[hora])))
     else:
         prox = [x for x in (d.get("evento") or {}).get("proximos", []) if x["dias"] > 0]
         L.append("Hoy no hay ningun dato programado.")

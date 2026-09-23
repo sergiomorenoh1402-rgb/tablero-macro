@@ -124,16 +124,113 @@ def bloque_rango(corte):
 
 
 # ------------------------------------------------------------------ 2. EVENTO
+# 23-sep-2026: el PMI preliminar de las 09:45 ET disparo el bono a 10 anos al
+# 5,09% y el NQ cayo 366 puntos desde la apertura. La lista de arriba no lo
+# tenia, y la tarjeta dijo "hoy no hay ningun dato". Desde entonces el
+# calendario sale del de Forex Factory (semana actual y siguiente). La lista de
+# arriba queda de respaldo si la descarga falla, y para lo que FF no pone
+# (elecciones).
+# Ojo: FF marca el PMI preliminar como impacto BAJO. Por eso, ademas de los de
+# impacto alto y medio, entran siempre los de LISTA_FIJA aunque vengan en bajo.
+FF_URLS = ["https://nfs.faireconomy.media/ff_calendar_thisweek.json",
+           "https://nfs.faireconomy.media/ff_calendar_nextweek.json"]
+LISTA_FIJA = ["PMI", "ISM", "GDP", "PCE", "Retail Sales", "PPI", "CPI",
+              "Non-Farm", "JOLTS", "FOMC Statement", "Federal Funds Rate",
+              "FOMC Press Conference", "FOMC Meeting Minutes"]
+TRADUCE = [("Flash Manufacturing PMI", "PMI manufacturero preliminar"),
+           ("Flash Services PMI", "PMI de servicios preliminar"),
+           ("ISM Manufacturing PMI", "ISM manufacturero"),
+           ("ISM Services PMI", "ISM de servicios"),
+           ("Unemployment Claims", "Peticiones de subsidio por desempleo"),
+           ("Non-Farm Employment Change", "Informe de empleo (NFP)"),
+           ("Core PCE Price Index", "PCE subyacente"),
+           ("Core CPI", "IPC subyacente"), ("CPI", "IPC"),
+           ("Core PPI", "IPP subyacente"), ("PPI", "IPP"),
+           ("Advance GDP", "PIB preliminar"), ("GDP", "PIB"),
+           ("Core Retail Sales", "Ventas minoristas subyacentes"),
+           ("Retail Sales", "Ventas minoristas"),
+           ("JOLTS Job Openings", "Vacantes JOLTS"),
+           ("Federal Funds Rate", "Decision de tipos de la Fed"),
+           ("FOMC Statement", "Comunicado del FOMC"),
+           ("FOMC Press Conference", "Rueda de prensa de la Fed"),
+           ("FOMC Meeting Minutes", "Actas del FOMC"),
+           ("UoM Consumer Sentiment", "Confianza del consumidor (Michigan)"),
+           ("UoM Inflation Expectations", "Expectativas de inflacion (Michigan)"),
+           ("President Trump Speaks", "Habla Trump")]
+
+
+def traducir(titulo):
+    for en, es in TRADUCE:
+        if en in titulo:
+            return es + (" (revisado)" if titulo.startswith("Revised") else "")
+    return titulo
+
+
+def bajar_ff(url):
+    """FF corta con 429 si se le pide seguido: una sola bajada por pasada y un
+    reintento a los 20 s."""
+    if url not in _CACHE:
+        try:
+            _CACHE[url] = bajar(url)
+        except Exception:
+            import time
+            time.sleep(20)
+            _CACHE[url] = bajar(url)
+    return _CACHE[url]
+
+
+def calendario_ff():
+    """Eventos de EE.UU. de las dos semanas de FF, o None si no se pudo bajar."""
+    out = []
+    try:
+        for url in FF_URLS:
+            try:
+                datos = bajar_ff(url)
+            except Exception:
+                if url == FF_URLS[0]:
+                    raise          # sin la semana actual no vale nada
+                continue           # la siguiente a veces no esta publicada
+            for e in datos:
+                if e.get("country") != "USD":
+                    continue
+                t = e.get("title", "")
+                imp = e.get("impact", "")
+                fijo = any(k in t for k in LISTA_FIJA)
+                if imp not in ("High", "Medium") and not fijo:
+                    continue
+                if "Speaks" in t and "Trump" not in t and imp != "High":
+                    continue       # los discursos de miembros de la Fed, fuera
+                f = e["date"][:10]
+                hora = e["date"][11:16]    # FF da la hora ya en ET
+                peso = "alto" if imp == "High" or fijo else "medio"
+                out.append((f, hora, traducir(t), peso))
+    except Exception as err:
+        print("calendario FF no disponible: %s" % err, file=sys.stderr)
+        return None
+    return out
+
+
 def bloque_evento(hoy):
-    prox = []
-    for f, hora, que, peso in EVENTOS:
+    ff = calendario_ff()
+    if ff is None:
+        lista = list(EVENTOS)
+    else:
+        # FF solo cubre dos semanas: mas alla (y lo que FF no pone, como las
+        # elecciones) sigue saliendo de la lista a mano.
+        horizonte = max((x[0] for x in ff), default=hoy.isoformat())
+        lista = ff + [x for x in EVENTOS if x[0] > horizonte or x[1] == "-----"]
+    vistos, prox = set(), []
+    for f, hora, que, peso in lista:
         d = datetime.date.fromisoformat(f)
-        if d >= hoy:
-            prox.append({"fecha": f, "hora": hora, "que": que, "peso": peso,
-                         "dias": (d - hoy).days})
-    prox.sort(key=lambda x: x["fecha"])
+        if d < hoy or (f, hora, que) in vistos:
+            continue
+        vistos.add((f, hora, que))
+        prox.append({"fecha": f, "hora": hora, "que": que, "peso": peso,
+                     "dias": (d - hoy).days})
+    prox.sort(key=lambda x: (x["fecha"], x["hora"]))
     hoy_hay = [p for p in prox if p["dias"] == 0]
-    return {"hoy": hoy_hay, "proximos": prox[:5]}
+    return {"hoy": hoy_hay, "proximos": prox[:5],
+            "fuente": "manual" if ff is None else "forexfactory"}
 
 
 # ----------------------------------------------------------------- 3. TABLERO
